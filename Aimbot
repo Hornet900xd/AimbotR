@@ -1,0 +1,283 @@
+-- Ensure this script is run on the client-side
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Mouse = LocalPlayer:GetMouse()
+local Camera = game.Workspace.CurrentCamera
+local RunService = game:GetService("RunService")
+
+local AimbotEnabled = false
+local TeamCheckEnabled = false -- Variable to track whether team check is enabled
+local ESPEnabled = false -- Variable to track whether ESP is enabled
+local ScreenGui = nil
+local Frame = nil
+local Watermark = nil
+local UIClosed = false
+local AimAtHead = false
+local AimAtChest = false
+
+-- Function to make the UI draggable
+local function MakeUIDraggable(frame)
+    local dragging
+    local dragInput
+    local dragStart
+    local startPos
+
+    local function update(input)
+        local delta = input.Position - dragStart
+        frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+
+    frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+
+    frame.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+
+    game:GetService("UserInputService").InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            update(input)
+        end
+    end)
+end
+
+-- Function to create the main UI
+local function CreateMainUI()
+    if UIClosed then return end
+
+    -- Create ScreenGui if it doesn't exist
+    ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "AimbotUI"
+    ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+    -- Create Frame if it doesn't exist
+    Frame = Instance.new("Frame")
+    Frame.Size = UDim2.new(0, 200, 0, 300) -- Increased height to accommodate ESP button
+    Frame.Position = UDim2.new(0, 10, 0, 10)
+    Frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    Frame.BorderSizePixel = 0
+    Frame.Parent = ScreenGui
+
+    -- Make the UI draggable
+    MakeUIDraggable(Frame)
+
+    -- Create Title
+    local Title = Instance.new("TextLabel")
+    Title.Size = UDim2.new(1, 0, 0, 30)
+    Title.Position = UDim2.new(0, 0, 0, 0)
+    Title.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    Title.Text = "Aimbot"
+    Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Title.TextScaled = true
+    Title.Parent = Frame
+
+    -- Create Toggle Button
+    local ToggleButton = Instance.new("TextButton")
+    ToggleButton.Size = UDim2.new(1, 0, 0, 50)
+    ToggleButton.Position = UDim2.new(0, 0, 0, 50)
+    ToggleButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+    ToggleButton.Text = "Aimbot: OFF"
+    ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    ToggleButton.TextScaled = true
+    ToggleButton.Parent = Frame
+
+    -- Toggle Button Functionality
+    ToggleButton.MouseButton1Click:Connect(function()
+        AimbotEnabled = not AimbotEnabled
+        ToggleButton.Text = "Aimbot: " .. (AimbotEnabled and "ON" or "OFF")
+        ToggleButton.BackgroundColor3 = AimbotEnabled and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+    end)
+    
+    -- Create Head Button
+    local HeadButton = Instance.new("TextButton")
+    HeadButton.Size = UDim2.new(1, 0, 0, 50)
+    HeadButton.Position = UDim2.new(0, 0, 0, 100)
+    HeadButton.BackgroundColor3 = Color3.fromRGB(0, 0, 255)
+    HeadButton.Text = "Aim: Head"
+    HeadButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    HeadButton.TextScaled = true
+    HeadButton.Parent = Frame
+
+    -- Head Button Functionality
+    HeadButton.MouseButton1Click:Connect(function()
+        AimAtHead = not AimAtHead
+        HeadButton.BackgroundColor3 = AimAtHead and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(0, 0, 255)
+        if AimAtHead then
+            AimAtChest = false
+            ChestButton.BackgroundColor3 = Color3.fromRGB(0, 0, 255)
+        end
+    end)
+    
+    -- Create Chest Button
+    local ChestButton = Instance.new("TextButton")
+    ChestButton.Size = UDim2.new(1, 0, 0, 50)
+    ChestButton.Position = UDim2.new(0, 0, 0, 150)
+    ChestButton.BackgroundColor3 = Color3.fromRGB(0, 0, 255)
+    ChestButton.Text = "Aim: Chest"
+    ChestButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    ChestButton.TextScaled = true
+    ChestButton.Parent = Frame
+
+    -- Chest Button Functionality
+    ChestButton.MouseButton1Click:Connect(function()
+        AimAtChest = not AimAtChest
+        ChestButton.BackgroundColor3 = AimAtChest and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(0, 0, 255)
+        if AimAtChest then
+            AimAtHead = false
+            HeadButton.BackgroundColor3 = Color3.fromRGB(0, 0, 255)
+        end
+    end)
+
+   -- Create Team Check Button
+    local TeamCheckButton = Instance.new("TextButton")
+    TeamCheckButton.Size = UDim2.new(1, 0, 0, 50)
+    TeamCheckButton.Position = UDim2.new(0, 0, 0, 200) -- Adjusted position
+    TeamCheckButton.BackgroundColor3 = Color3.fromRGB(255, 255, 0) -- Yellow color
+    TeamCheckButton.Text = "Team Check: OFF"
+    TeamCheckButton.TextColor3 = Color3.fromRGB(0, 0, 0) -- Black color
+    TeamCheckButton.TextScaled = true
+    TeamCheckButton.Parent = Frame
+
+    -- Team Check Button Functionality
+    TeamCheckButton.MouseButton1Click:Connect(function()
+        TeamCheckEnabled = not TeamCheckEnabled
+        TeamCheckButton.Text = "Team Check: " .. (TeamCheckEnabled and "ON" or "OFF")
+    end)
+    
+    -- Create ESP Button
+    local ESPButton = Instance.new("TextButton")
+    ESPButton.Size = UDim2.new(1, 0, 0, 50)
+    ESPButton.Position = UDim2.new(0, 0, 0, 250) -- Adjusted position
+    ESPButton.BackgroundColor3 = Color3.fromRGB(0, 255, 255) -- Cyan color
+    ESPButton.Text = "ESP"
+    ESPButton.TextColor3 = Color3.fromRGB(0, 0, 0) -- Black color
+    ESPButton.TextScaled = true
+    ESPButton.Parent = Frame
+
+    -- ESP Button Functionality
+    ESPButton.MouseButton1Click:Connect(function()
+        loadstring(game:HttpGet('https://raw.githubusercontent.com/fatesc/fates-esp/main/main.lua'))()
+    end)
+
+    -- Create Close Button
+    local CloseButton = Instance.new("TextButton")
+    CloseButton.Size = UDim2.new(0, 30, 0, 30)
+    CloseButton.Position = UDim2.new(1, -35, 0, 5)
+    CloseButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+    CloseButton.Text = "X"
+    CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    CloseButton.TextScaled = true
+    CloseButton.Parent = Frame
+
+    -- Close Button Functionality
+    CloseButton.MouseButton1Click:Connect(function()
+        ScreenGui:Destroy()
+        UIClosed = true -- Set flag to true to prevent UI from showing again
+    end)
+end
+
+-- Function to create the watermark
+local function CreateWatermark()
+    -- Create ScreenGui for watermark if it doesn't exist
+    local WatermarkGui = Instance.new("ScreenGui")
+    WatermarkGui.Name = "WatermarkUI"
+    WatermarkGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+    -- Create Watermark text
+    Watermark = Instance.new("TextLabel")
+    Watermark.Size = UDim2.new(0, 100, 0, 20)
+    Watermark.Position = UDim2.new(0, 10, 1, -30) -- Adjusted position
+    Watermark.AnchorPoint = Vector2.new(0, 1)
+    Watermark.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    Watermark.Text = "Made By Takumi"
+    Watermark.TextColor3 = Color3.fromRGB(0, 0, 0) -- Black color
+    Watermark.TextScaled = true
+    Watermark.Font = Enum.Font.SourceSansBold
+    Watermark.Parent = WatermarkGui
+end
+
+-- Function to handle character respawn
+local function HandleCharacterRespawn()
+    -- Recreate the main UI after respawn
+    CreateMainUI()
+end
+
+-- Listen for character respawn
+LocalPlayer.CharacterAdded:Connect(HandleCharacterRespawn)
+
+-- Create the watermark initially
+CreateWatermark()
+
+-- Create the main UI initially
+CreateMainUI()
+
+-- Function to get the nearest target
+local function GetNearestTarget()
+    local NearestTarget = nil
+    local ShortestDistance = math.huge
+
+    for _, Player in pairs(Players:GetPlayers()) do
+        if Player ~= LocalPlayer and Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") and Player.Character:FindFirstChildOfClass("Humanoid").Health > 0 then
+            -- Check if team check is enabled and if the target is in the same team
+            if not TeamCheckEnabled or (TeamCheckEnabled and Player.Team ~= LocalPlayer.Team) then
+                local TargetPos = Player.Character.HumanoidRootPart.Position
+                local ScreenPos, OnScreen = Camera:WorldToViewportPoint(TargetPos)
+
+                if OnScreen then
+                    local Distance = (Vector2.new(Mouse.X, Mouse.Y) - Vector2.new(ScreenPos.X, ScreenPos.Y)).Magnitude
+                    if Distance < ShortestDistance then
+                        -- Check if there's an obstruction between the player and the target
+                        local Ray = Ray.new(Camera.CFrame.Position, TargetPos - Camera.CFrame.Position)
+                        local Part, Position = workspace:FindPartOnRay(Ray, LocalPlayer.Character, false, true)
+
+                        if Part and Part:IsDescendantOf(Player.Character) then
+                            ShortestDistance = Distance
+                            NearestTarget = Player
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    return NearestTarget
+end
+
+-- Function to aim at the target
+local function AimAt(Target)
+    if not Target or not Target.Character then return end
+
+    local AimPart
+    if AimAtHead and Target.Character:FindFirstChild("Head") then
+        AimPart = "Head"
+    elseif AimAtChest and Target.Character:FindFirstChild("HumanoidRootPart") then
+        AimPart = "HumanoidRootPart"
+    end
+
+    if AimPart then
+        local TargetPos = Target.Character[AimPart].Position
+        Camera.CFrame = CFrame.new(Camera.CFrame.Position, TargetPos)
+    end
+end
+
+-- Main loop to run the aimbot
+RunService.RenderStepped:Connect(function()
+    if AimbotEnabled and (AimAtHead or AimAtChest) then
+   local Target = GetNearestTarget()
+        AimAt(Target)
+    end
+end)
